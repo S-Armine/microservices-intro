@@ -1,0 +1,4 @@
+rootProject.name = 'task-1'
+
+include 'resource-service'
+include 'song-service'
