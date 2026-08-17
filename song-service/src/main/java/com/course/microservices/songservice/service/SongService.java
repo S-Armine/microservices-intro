@@ -11,11 +11,12 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+import static com.course.microservices.songservice.exception.CsvTooLongException.MAX_CSV_LENGTH;
+
 @Service
 @RequiredArgsConstructor
 public class SongService {
 
-    private static final int MAX_CSV_LENGTH = 200;
     private final SongRepository songRepository;
 
     public SongDto getSongById(Long id) {

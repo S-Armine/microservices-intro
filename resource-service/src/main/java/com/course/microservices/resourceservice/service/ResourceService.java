@@ -11,11 +11,12 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static com.course.microservices.resourceservice.exception.CsvTooLongException.MAX_CSV_LENGTH;
+
 @Service
 @RequiredArgsConstructor
 public class ResourceService {
 
-    private static final int MAX_CSV_LENGTH = 200;
     private final ResourceRepository resourceRepository;
     private final Mp3MetadataExtractorService mp3MetadataExtractorService;
     private final SongServiceClient songServiceClient;
