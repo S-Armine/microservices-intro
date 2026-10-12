@@ -1,9 +1,5 @@
-package com.course.microservices.resourceservice.exception;
+package com.course.microservices.resourceprocessor.exception;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.ResponseStatus;
-
-@ResponseStatus(HttpStatus.BAD_REQUEST)
 public class InvalidMp3Exception extends RuntimeException {
     public InvalidMp3Exception(String message) {
         super(message);

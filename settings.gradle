@@ -1,5 +1,6 @@
-rootProject.name = 'task-1'
+rootProject.name = 'microservices'
 
 include 'resource-service'
 include 'song-service'
 include 'eureka-server'
+include 'resource-processor'
