@@ -29,13 +29,14 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://resource-db:5432/resource-db
       SPRING_DATASOURCE_USERNAME: ${RESOURCE_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${RESOURCE_DB_PASSWORD}
-      SONG_SERVICE_URL: http://song-service:8080
       SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
     ports:
       - "8080:8080"
     depends_on:
       - resource-db
       - song-service
+      - eureka-server
 
   song-service:
     build:
@@ -46,7 +47,20 @@ services:
       SPRING_DATASOURCE_USERNAME: ${SONG_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SONG_DB_PASSWORD}
       SERVER_PORT: 8080
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    deploy:
+      replicas: 2
     ports:
-      - "8081:8080"
+      - "8080"
     depends_on:
       - song-db
+      - eureka-server
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    environment:
+      SERVER_PORT: 8761
+    ports:
+      - "8761:8761"
