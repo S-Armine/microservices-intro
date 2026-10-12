@@ -2,8 +2,8 @@ package com.course.microservices.resourceservice.advice;
 
 import com.course.microservices.resourceservice.dto.ErrorResponse;
 import com.course.microservices.resourceservice.exception.CsvTooLongException;
-import com.course.microservices.resourceservice.exception.InvalidMp3Exception;
 import com.course.microservices.resourceservice.exception.ResourceNotFoundException;
+import com.course.microservices.resourceservice.exception.ResourceStorageException;
 import com.course.microservices.resourceservice.exception.SongServiceInvocationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -23,11 +23,6 @@ public class ResourceServiceExceptionHandler {
 
     @ExceptionHandler(CsvTooLongException.class)
     public ResponseEntity<ErrorResponse> handleCsvTooLong(CsvTooLongException e) {
-        return error(HttpStatus.BAD_REQUEST, e.getMessage());
-    }
-
-    @ExceptionHandler(InvalidMp3Exception.class)
-    public ResponseEntity<ErrorResponse> handleInvalidMp3(InvalidMp3Exception e) {
         return error(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
@@ -66,8 +61,8 @@ public class ResourceServiceExceptionHandler {
         return error(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
-    @ExceptionHandler(SongServiceInvocationException.class)
-    public ResponseEntity<ErrorResponse> handleSongServiceInvocation(SongServiceInvocationException e) {
+    @ExceptionHandler({SongServiceInvocationException.class, ResourceStorageException.class})
+    public ResponseEntity<ErrorResponse> handleServiceInvocation(RuntimeException e) {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
     }
 

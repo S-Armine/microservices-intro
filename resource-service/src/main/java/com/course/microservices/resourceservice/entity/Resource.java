@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -20,10 +18,11 @@ public class Resource {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Lob
-    @JdbcTypeCode(SqlTypes.BINARY)
-    @Column(name = "audio_data", nullable = false)
-    private byte[] audioData;
+    @Column(name = "s3_bucket", nullable = false)
+    private String s3Bucket;
+
+    @Column(name = "s3_key", nullable = false, unique = true, length = 1024)
+    private String s3Key;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
