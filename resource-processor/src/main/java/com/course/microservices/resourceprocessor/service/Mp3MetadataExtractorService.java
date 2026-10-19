@@ -1,8 +1,7 @@
-package com.course.microservices.resourceservice.service;
+package com.course.microservices.resourceprocessor.service;
 
-import com.course.microservices.resourceservice.dto.SongMetadataDto;
-import com.course.microservices.resourceservice.exception.InvalidMp3Exception;
-import org.apache.tika.Tika;
+import com.course.microservices.resourceprocessor.dto.SongMetadataDto;
+import com.course.microservices.resourceprocessor.exception.InvalidMp3Exception;
 import org.apache.tika.exception.TikaException;
 import org.apache.tika.metadata.Metadata;
 import org.apache.tika.metadata.TikaCoreProperties;
