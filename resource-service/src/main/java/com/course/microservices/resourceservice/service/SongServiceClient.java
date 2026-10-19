@@ -1,13 +1,10 @@
 package com.course.microservices.resourceservice.service;
 
-import com.course.microservices.resourceservice.dto.SongMetadataDto;
-import com.course.microservices.resourceservice.exception.SongServiceInvocationException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
+import org.springframework.resilience.annotation.Retryable;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 
@@ -17,18 +14,12 @@ public class SongServiceClient {
 
     private final RestClient songServiceRestClient;
 
-    public void sendMetadata(SongMetadataDto metadata) {
-        try {
-            songServiceRestClient.post()
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(metadata)
-                    .retrieve()
-                    .toBodilessEntity();
-        } catch (RestClientResponseException | ResourceAccessException ex) {
-            throw new SongServiceInvocationException("Failed to save song metadata in song service", ex);
-        }
-    }
-
+    @Retryable(
+            includes = RestClientException.class,
+            maxRetries = 2,
+            delay = 1000,
+            multiplier = 2
+    )
     public void deleteMetadata(List<Long> resourceIds) {
         songServiceRestClient.delete()
                 .uri(uriBuilder -> uriBuilder.queryParam("id", resourceIds).build())
