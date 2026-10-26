@@ -3,6 +3,7 @@ package com.course.microservices.resourceservice.service;
 import com.course.microservices.resourceservice.entity.Resource;
 import com.course.microservices.resourceservice.exception.CsvTooLongException;
 import com.course.microservices.resourceservice.exception.ResourceNotFoundException;
+import com.course.microservices.resourceservice.producer.ResourceProducer;
 import com.course.microservices.resourceservice.repo.ResourceRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +22,7 @@ public class ResourceService {
     private final ResourceRepository resourceRepository;
     private final SongServiceClient songServiceClient;
     private final ResourceStorageService resourceStorageService;
+    private final ResourceProducer resourceProducer;
 
     @Value("${aws.s3.bucket}")
     private String bucket;
@@ -55,6 +57,7 @@ public class ResourceService {
         String key = "resources/" + UUID.randomUUID() + ".mp3";
         resourceStorageService.upload(bucket, key, audioData);
         Resource savedResource = resourceRepository.save(new Resource(null, bucket, key, LocalDateTime.now()));
+        resourceProducer.sendMessage(savedResource.getId().toString());
         return savedResource.getId();
     }
 }

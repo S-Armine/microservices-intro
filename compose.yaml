@@ -1,4 +1,39 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-app}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-app}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq:U
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  localstack:
+    image: localstack/localstack:3.8.1
+    environment:
+      SERVICES: s3
+      AWS_DEFAULT_REGION: us-east-1
+      RESOURCE_S3_BUCKET: resources
+    ports:
+      - "4566:4566"
+    volumes:
+      - ./init-scripts/localstack/init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "awslocal s3api head-bucket --bucket \"$${RESOURCE_S3_BUCKET}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   resource-db:
     image: postgres:17-alpine
     environment:
@@ -31,12 +66,44 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${RESOURCE_DB_PASSWORD}
       SERVER_PORT: 8080
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_DEFAULT_REGION: us-east-1
+      RESOURCE_S3_BUCKET: resources
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-app}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-app}
+      RESOURCE_PROCESSOR_QUEUE: resource-processing
     ports:
       - "8080:8080"
     depends_on:
-      - resource-db
-      - song-service
-      - eureka-server
+      resource-db:
+        condition: service_started
+      song-service:
+        condition: service_started
+      eureka-server:
+        condition: service_started
+      localstack:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  resource-processor:
+    build:
+      context: .
+      dockerfile: resource-processor/Dockerfile
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-app}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-app}
+      RESOURCE_PROCESSOR_QUEUE: resource-processing
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
 
   song-service:
     build:
@@ -64,3 +131,6 @@ services:
       SERVER_PORT: 8761
     ports:
       - "8761:8761"
+
+volumes:
+  rabbitmq-data:
