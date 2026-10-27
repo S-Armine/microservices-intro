@@ -1,0 +1,10 @@
+description: after an upload the id of the new resource is published for processing
+name: resource_uploaded
+label: resource_uploaded
+input:
+  triggeredBy: resourceUploaded()
+outputMessage:
+  sentTo: resource-processing-exchange
+  headers:
+    amqp_receivedRoutingKey: resource-processing-routing-key
+  body: "1"

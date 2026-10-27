@@ -1,0 +1,10 @@
+description: resource-processor downloads the audio of an uploaded resource
+name: get_resource
+request:
+  method: GET
+  url: /resources/1
+response:
+  status: 200
+  headers:
+    Content-Type: audio/mpeg
+  body: "ID3-fake-mp3-bytes"

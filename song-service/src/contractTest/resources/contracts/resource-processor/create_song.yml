@@ -1,0 +1,20 @@
+description: resource-processor sends the metadata it extracted and song-service stores it
+name: create_song
+request:
+  method: POST
+  url: /songs
+  headers:
+    Content-Type: application/json
+  body:
+    id: 1
+    name: Yesterday
+    artist: The Beatles
+    album: Help!
+    duration: "02:05"
+    year: "1965"
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    id: 1

@@ -1,0 +1,44 @@
+plugins {
+    id 'java'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+description = 'e2e-tests'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencyManagement {
+    imports {
+        mavenBom 'org.springframework.boot:spring-boot-dependencies:4.1.1'
+    }
+}
+
+dependencies {
+    testImplementation 'io.cucumber:cucumber-java:7.34.9'
+    testImplementation 'io.cucumber:cucumber-junit-platform-engine:7.34.9'
+    testImplementation 'org.junit.platform:junit-platform-suite'
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'org.assertj:assertj-core'
+    testImplementation 'com.jayway.jsonpath:json-path'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// These tests need the whole system running (docker compose up). When it is not reachable the
+// scenarios are skipped, so a plain `gradlew check` still works on a machine without Docker.
+tasks.named('test') {
+    useJUnitPlatform()
+    ['E2E_RESOURCE_SERVICE_URL', 'E2E_SONG_SERVICE_URL'].each { name ->
+        System.getenv(name)?.with { value -> environment name, value }
+    }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
+}
