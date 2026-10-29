@@ -31,7 +31,6 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// Keep environment-dependent E2E scenarios out of the default test lifecycle.
 tasks.named('test') {
     enabled = false
 }
