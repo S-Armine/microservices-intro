@@ -1,0 +1,14 @@
+description: resource-service asks song-service to drop the metadata of a deleted resource
+name: delete_songs
+request:
+  method: DELETE
+  urlPath: /songs
+  queryParameters:
+    id: "1"
+response:
+  status: 200
+  headers:
+    Content-Type: application/json
+  body:
+    ids:
+      - 1

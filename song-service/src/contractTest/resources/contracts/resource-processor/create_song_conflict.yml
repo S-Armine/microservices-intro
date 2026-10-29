@@ -1,0 +1,21 @@
+description: resource-processor sends metadata for a resource that already has a song
+name: create_song_conflict
+request:
+  method: POST
+  url: /songs
+  headers:
+    Content-Type: application/json
+  body:
+    id: 2
+    name: Yesterday
+    artist: The Beatles
+    album: Help!
+    duration: "02:05"
+    year: "1965"
+response:
+  status: 409
+  headers:
+    Content-Type: application/json
+  body:
+    errorMessage: Metadata for resource ID=2 already exists
+    errorCode: "409"
