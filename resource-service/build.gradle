@@ -82,6 +82,15 @@ tasks.named('publishAllPublicationsToStubsRepository') {
 
 tasks.named('test') {
     useJUnitPlatform()
+    dependsOn ':song-service:publishAllPublicationsToStubsRepository'
+
+    inputs.dir(rootProject.layout.buildDirectory.dir('stubs-repo').map {
+        it.dir('com').dir('course').dir('microservices').dir('song-service')
+    })
+            .withPropertyName('publishedStubs')
+
+    systemProperty 'spring.cloud.contract.stubrunner.repository-root',
+            rootProject.layout.buildDirectory.dir('stubs-repo').get().asFile.toURI().toString()
 }
 
 tasks.named('contractTest') {

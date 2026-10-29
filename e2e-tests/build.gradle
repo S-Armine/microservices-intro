@@ -31,9 +31,16 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// These tests need the whole system running (docker compose up). When it is not reachable the
-// scenarios are skipped, so a plain `gradlew check` still works on a machine without Docker.
+// Keep environment-dependent E2E scenarios out of the default test lifecycle.
 tasks.named('test') {
+    enabled = false
+}
+
+tasks.register('e2eTest', Test) {
+    group = 'verification'
+    description = 'Runs end-to-end tests against a running system.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
     useJUnitPlatform()
     ['E2E_RESOURCE_SERVICE_URL', 'E2E_SONG_SERVICE_URL'].each { name ->
         System.getenv(name)?.with { value -> environment name, value }

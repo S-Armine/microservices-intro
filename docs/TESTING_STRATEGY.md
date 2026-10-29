@@ -1,6 +1,6 @@
-﻿# Testing strategy
+# Testing strategy
 
-The project is tested in layers: fast isolated tests for service logic, tests against controlled dependencies for adapters and APIs, provider contracts between services, and a small end-to-end suite against the running stack. Everything except the end-to-end suite runs locally without Docker.
+The project is tested in layers: fast isolated tests for service logic, tests against controlled dependencies for adapters and APIs, provider and consumer contract tests between services, and a small end-to-end suite against the running stack. Everything except the end-to-end suite runs locally without Docker.
 
 ## Test layers
 
@@ -9,8 +9,9 @@ The project is tested in layers: fast isolated tests for service logic, tests ag
 | Unit | `src\test\java`, next to the production packages | module `test` |
 | Integration | `*IT` classes under `src\test\java` | module `test` |
 | Component | Cucumber suites in song-service and resource-processor | module `test` |
-| Contract | `src\contractTest` in song-service and resource-service | module `contractTest` |
-| End-to-end | `e2e-tests\src\test` | `:e2e-tests:test` |
+| Provider contract | `src\contractTest` in song-service and resource-service | module `contractTest` |
+| Consumer contract | Stub Runner tests in resource-processor and resource-service | module `test` |
+| End-to-end | `e2e-tests\src\test` | `:e2e-tests:e2eTest` |
 
 ## Unit tests
 
@@ -33,36 +34,26 @@ Cucumber describes behaviour in plain-language Given/When/Then steps stored in `
 
 Spring Cloud Contract generates provider tests from the YAML files in `src\contractTest\resources\contracts`.
 
-| Interaction | Provider | Consumer | Cases |
-|---|---|---|---|
-| Create song metadata | song-service | resource-processor | 200, 409 |
-| Delete song metadata | song-service | resource-service | 200 |
-| Download a resource | resource-service | resource-processor | 200, 404 |
-| Uploaded resource ID | resource-service | resource-processor | message body, exchange, routing key |
+Consumer-side contract tests run the real clients against WireMock stubs loaded by Spring Cloud Contract Stub Runner. 
 
-HTTP contracts run on standalone MockMvc with real controllers and exception handlers but mocked services, so they check the API shape, not persistence. The messaging contract uses `MessagingContractBase`, which runs the real upload flow with an in-memory RabbitTemplate instead of a broker; the Gradle base-class mapping selects it for contracts in the `messaging` directory.
-
-Both providers publish stubs to `build\stubs-repo`, and publication depends on contract verification. No consumer test loads those stubs yet, so consumer compatibility is not verified. Generated tests and stubs under `build` are outputs: change the YAML, base classes or Gradle configuration instead.
+Provider stubs are published to `build\stubs-repo` after provider contract verification. The consumer test tasks depend on the appropriate providers' `publishAllPublicationsToStubsRepository` tasks and configure Stub Runner to use that local repository.
 
 ## End-to-end tests
 
-The `e2e-tests` module has five Cucumber scenarios over the public HTTP APIs: upload and wait for metadata, download unchanged, delete removes file and metadata, non-MP3 refused, unknown ID returns 404. They expect the Docker Compose stack (services, Eureka, PostgreSQL, RabbitMQ, LocalStack) and allow up to 30 seconds for asynchronous processing.
+The `e2e-tests` module has five Cucumber scenarios over the public HTTP APIs: upload and wait for metadata, download unchanged, delete removes file and metadata, non-MP3 refused, and unknown ID returns 404. They expect the Docker Compose stack (services, Eureka, PostgreSQL, RabbitMQ, LocalStack) and allow up to 30 seconds for asynchronous processing.
 
-If resource-service or song-service cannot be reached, the scenarios are skipped and Gradle still succeeds. Check the report for skipped scenarios before treating a green run as proof.
+The E2E scenarios are excluded from the default `test` lifecycle. The `:e2e-tests:test` task is disabled; run `:e2e-tests:e2eTest` explicitly with the Compose stack running. The step definitions still skip scenarios if either service is unreachable, so check the test report for skipped scenarios before treating a green E2E run as proof that scenarios executed.
 
 ## Running the tests
 
-Run from the repository root in PowerShell. Docker is needed only for end-to-end tests.
+Run from the repository root in PowerShell. These Gradle tasks run unit, integration, component, provider contract and consumer contract tests; the disabled E2E `test` task is not executed.
 
 ```powershell
-# Unit, integration and component tests
-.\gradlew.bat :song-service:test :resource-service:test :resource-processor:test --console=plain
-
-# Contract tests
-.\gradlew.bat :song-service:contractTest :resource-service:contractTest --console=plain
+# Run all non-E2E test and provider contract tasks from a clean build
+.\gradlew.bat clean test contractTest --console=plain
 ```
 
-End-to-end tests need the Compose stack and the database variables from `compose.yaml`:
+End-to-end tests need Docker and the Compose environment variables configured for the services. Start the stack and obtain a song-service replica's published host port:
 
 ```powershell
 docker compose up -d --build
@@ -70,7 +61,5 @@ docker compose port --index 1 song-service 8080
 
 $env:E2E_RESOURCE_SERVICE_URL = "http://localhost:8080"
 $env:E2E_SONG_SERVICE_URL = "http://localhost:<reported-port>"
-.\gradlew.bat :e2e-tests:test --rerun-tasks --console=plain
+.\gradlew.bat :e2e-tests:e2eTest --rerun-tasks --console=plain
 ```
-
-Song-service runs two replicas on dynamic host ports, so set `E2E_SONG_SERVICE_URL` explicitly; the default `http://localhost:8081` will not match. `--rerun-tasks` prevents a cached result from being reused.
