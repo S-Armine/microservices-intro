@@ -1,0 +1,12 @@
+description: resource-processor asks for a resource that does not exist
+name: get_resource_not_found
+request:
+  method: GET
+  url: /resources/404
+response:
+  status: 404
+  headers:
+    Content-Type: application/json
+  body:
+    errorMessage: Resource with ID=404 not found
+    errorCode: "404"
