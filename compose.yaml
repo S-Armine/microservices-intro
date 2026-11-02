@@ -1,15 +1,14 @@
 services:
   rabbitmq:
-    image: rabbitmq:4-management-alpine
-    hostname: rabbitmq
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    restart: unless-stopped
     environment:
-      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-app}
-      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-app}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
       - "5672:5672"
       - "15672:15672"
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq:U
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 5s
@@ -20,9 +19,9 @@ services:
   localstack:
     image: localstack/localstack:3.8.1
     environment:
-      SERVICES: s3
-      AWS_DEFAULT_REGION: us-east-1
-      RESOURCE_S3_BUCKET: resources
+      SERVICES: ${LOCALSTACK_SERVICES}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      RESOURCE_S3_BUCKET: ${RESOURCE_S3_BUCKET}
     ports:
       - "4566:4566"
     volumes:
@@ -44,6 +43,12 @@ services:
       - "5434:5432"
     volumes:
       - ./init-scripts/resource-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   song-db:
     image: postgres:17-alpine
@@ -55,6 +60,12 @@ services:
       - "5433:5432"
     volumes:
       - ./init-scripts/song-db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   resource-service:
     build:
@@ -64,25 +75,29 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://resource-db:5432/resource-db
       SPRING_DATASOURCE_USERNAME: ${RESOURCE_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${RESOURCE_DB_PASSWORD}
-      SERVER_PORT: 8080
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
-      AWS_ENDPOINT_URL: http://localstack:4566
-      AWS_DEFAULT_REGION: us-east-1
-      RESOURCE_S3_BUCKET: resources
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-app}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-app}
-      RESOURCE_PROCESSOR_QUEUE: resource-processing
+      SERVER_PORT: ${RESOURCE_SERVICE_PORT:-8080}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
+      AWS_ENDPOINT_URL: ${AWS_ENDPOINT_URL}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+      RESOURCE_S3_BUCKET: ${RESOURCE_S3_BUCKET}
+      SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST}
+      SPRING_RABBITMQ_PORT: ${SPRING_RABBITMQ_PORT}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RESOURCE_PROCESSOR_QUEUE: ${RESOURCE_PROCESSOR_QUEUE}
     ports:
-      - "8080:8080"
+      - "${RESOURCE_SERVICE_PORT:-8080}:${RESOURCE_SERVICE_PORT:-8080}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${RESOURCE_SERVICE_PORT:-8080}/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       resource-db:
-        condition: service_started
-      song-service:
-        condition: service_started
+        condition: service_healthy
       eureka-server:
-        condition: service_started
+        condition: service_healthy
       localstack:
         condition: service_healthy
       rabbitmq:
@@ -93,17 +108,28 @@ services:
       context: .
       dockerfile: resource-processor/Dockerfile
     environment:
-      SPRING_RABBITMQ_HOST: rabbitmq
-      SPRING_RABBITMQ_PORT: 5672
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER:-app}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS:-app}
-      RESOURCE_PROCESSOR_QUEUE: resource-processing
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SERVER_PORT: ${RESOURCE_PROCESSOR_PORT:-8082}
+      SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST}
+      SPRING_RABBITMQ_PORT: ${SPRING_RABBITMQ_PORT}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RESOURCE_PROCESSOR_QUEUE: ${RESOURCE_PROCESSOR_QUEUE}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${RESOURCE_PROCESSOR_PORT:-8082}/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
       rabbitmq:
         condition: service_healthy
       eureka-server:
-        condition: service_started
+        condition: service_healthy
+      resource-service:
+        condition: service_healthy
+      song-service:
+        condition: service_healthy
 
   song-service:
     build:
@@ -113,24 +139,35 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://song-db:5432/song-db
       SPRING_DATASOURCE_USERNAME: ${SONG_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SONG_DB_PASSWORD}
-      SERVER_PORT: 8080
-      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      SERVER_PORT: ${SONG_SERVICE_PORT:-8081}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
     deploy:
       replicas: 2
     ports:
-      - "8080"
+      - "${SONG_SERVICE_PORT:-8081}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${SONG_SERVICE_PORT:-8081}/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     depends_on:
-      - song-db
-      - eureka-server
+      song-db:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
 
   eureka-server:
     build:
       context: .
       dockerfile: eureka-server/Dockerfile
     environment:
-      SERVER_PORT: 8761
+      SERVER_PORT: ${EUREKA_SERVER_PORT:-8761}
     ports:
-      - "8761:8761"
-
-volumes:
-  rabbitmq-data:
+      - "${EUREKA_SERVER_PORT:-8761}:${EUREKA_SERVER_PORT:-8761}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${EUREKA_SERVER_PORT:-8761}/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
