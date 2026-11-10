@@ -18,10 +18,6 @@ import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebExceptionHandler;
 import reactor.core.publisher.Mono;
 
-/**
- * Converts every gateway failure into a JSON body that does not leak internals.
- * Order -2 puts it ahead of Spring Boot's default error handler.
- */
 @Component
 @Order(-2)
 public class GatewayErrorHandler implements WebExceptionHandler {
