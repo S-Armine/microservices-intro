@@ -171,3 +171,22 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    environment:
+      SERVER_PORT: ${API_GATEWAY_PORT:-8083}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
+    ports:
+      - "${API_GATEWAY_PORT:-8083}:${API_GATEWAY_PORT:-8083}"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:${API_GATEWAY_PORT:-8083}/actuator/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      eureka-server:
+        condition: service_healthy
