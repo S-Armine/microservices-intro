@@ -1,6 +1,8 @@
 package com.course.microservices.resourceservice.service;
 
+import com.course.microservices.resourceservice.dto.StorageDto;
 import com.course.microservices.resourceservice.entity.Resource;
+import com.course.microservices.resourceservice.entity.ResourceState;
 import com.course.microservices.resourceservice.exception.CsvTooLongException;
 import com.course.microservices.resourceservice.exception.ResourceNotFoundException;
 import com.course.microservices.resourceservice.exception.ResourceStorageException;
@@ -14,7 +16,6 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -25,6 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -42,13 +44,16 @@ class ResourceServiceTest {
     private ResourceStorageService storageService;
     @Mock
     private ResourceProducer producer;
+    @Mock
+    private StorageServiceClient storageServiceClient;
 
     @InjectMocks
     private ResourceService resourceService;
 
     @BeforeEach
-    void setBucket() {
-        ReflectionTestUtils.setField(resourceService, "bucket", "resources");
+    void stubStagingStorage() {
+        lenient().when(storageServiceClient.getStorageByType("STAGING"))
+                .thenReturn(new StorageDto(1L, "STAGING", "resources", "resources"));
     }
 
     @Test
@@ -84,7 +89,7 @@ class ResourceServiceTest {
 
     @Test
     void getResourceReadsTheFileFromTheStoredLocation() {
-        Resource resource = new Resource(3L, "resources", "resources/a.mp3", LocalDateTime.now());
+        Resource resource = new Resource(3L, "resources", "resources/a.mp3", ResourceState.STAGING, LocalDateTime.now());
         when(resourceRepository.findById(3L)).thenReturn(Optional.of(resource));
         when(storageService.download("resources", "resources/a.mp3")).thenReturn(new byte[]{9});
 
@@ -102,8 +107,8 @@ class ResourceServiceTest {
 
     @Test
     void deleteRemovesMetadataThenFileThenRowForExistingIdsOnly() {
-        Resource first = new Resource(1L, "resources", "k1", LocalDateTime.now());
-        Resource second = new Resource(2L, "resources", "k2", LocalDateTime.now());
+        Resource first = new Resource(1L, "resources", "k1", ResourceState.STAGING, LocalDateTime.now());
+        Resource second = new Resource(2L, "resources", "k2", ResourceState.STAGING, LocalDateTime.now());
         when(resourceRepository.findAllById(List.of(1L, 2L, 3L))).thenReturn(List.of(first, second));
 
         List<Long> deleted = resourceService.deleteResources(List.of(1L, 2L, 3L), "1,2,3");
@@ -129,7 +134,7 @@ class ResourceServiceTest {
 
     @Test
     void deleteKeepsTheFileWhenSongServiceFails() {
-        Resource resource = new Resource(1L, "resources", "k1", LocalDateTime.now());
+        Resource resource = new Resource(1L, "resources", "k1", ResourceState.STAGING, LocalDateTime.now());
         when(resourceRepository.findAllById(List.of(1L))).thenReturn(List.of(resource));
         doThrow(new IllegalStateException("song-service down")).when(songServiceClient).deleteMetadata(any());
 
@@ -148,5 +153,35 @@ class ResourceServiceTest {
                 .isInstanceOf(CsvTooLongException.class);
 
         verifyNoInteractions(resourceRepository);
+    }
+
+    @Test
+    void moveToPermanentCopiesTheFileUpdatesTheRowThenDeletesTheOriginal() {
+        Resource resource = new Resource(4L, "staging-bucket", "resources/a.mp3", ResourceState.STAGING, LocalDateTime.now());
+        when(resourceRepository.findById(4L)).thenReturn(Optional.of(resource));
+        when(storageServiceClient.getStorageByType("PERMANENT"))
+                .thenReturn(new StorageDto(2L, "PERMANENT", "permanent-bucket", "final"));
+
+        resourceService.moveToPermanent(4L);
+
+        assertThat(resource.getState()).isEqualTo(ResourceState.PERMANENT);
+        assertThat(resource.getS3Bucket()).isEqualTo("permanent-bucket");
+        assertThat(resource.getS3Key()).isEqualTo("final/a.mp3");
+        InOrder order = inOrder(storageService, resourceRepository);
+        order.verify(storageService).copy("staging-bucket", "resources/a.mp3", "permanent-bucket", "final/a.mp3");
+        order.verify(resourceRepository).save(resource);
+        order.verify(storageService).delete("staging-bucket", "resources/a.mp3");
+    }
+
+    @Test
+    void moveToPermanentIgnoresUnknownAndAlreadyPermanentResources() {
+        when(resourceRepository.findById(8L)).thenReturn(Optional.empty());
+        when(resourceRepository.findById(9L)).thenReturn(Optional.of(
+                new Resource(9L, "permanent-bucket", "final/b.mp3", ResourceState.PERMANENT, LocalDateTime.now())));
+
+        resourceService.moveToPermanent(8L);
+        resourceService.moveToPermanent(9L);
+
+        verifyNoInteractions(storageService, storageServiceClient);
     }
 }

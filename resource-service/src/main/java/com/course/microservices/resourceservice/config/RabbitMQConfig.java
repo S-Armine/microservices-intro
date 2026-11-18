@@ -20,6 +20,15 @@ public class RabbitMQConfig {
     @Value("${resource.processing.routing-key}")
     private String routingKey;
 
+    @Value("${resource.processed.queue}")
+    private String processedQueueName;
+
+    @Value("${resource.processed.exchange}")
+    private String processedExchangeName;
+
+    @Value("${resource.processed.routing-key}")
+    private String processedRoutingKey;
+
     @Bean
     public Queue resourceProcessingQueue() {
         return new Queue(queueName, true);
@@ -33,6 +42,21 @@ public class RabbitMQConfig {
     @Bean
     public Binding resourceProcessingBinding(Queue resourceProcessingQueue, TopicExchange resourceProcessingExchange) {
         return BindingBuilder.bind(resourceProcessingQueue).to(resourceProcessingExchange).with(routingKey);
+    }
+
+    @Bean
+    public Queue resourceProcessedQueue() {
+        return new Queue(processedQueueName, true);
+    }
+
+    @Bean
+    public TopicExchange resourceProcessedExchange() {
+        return new TopicExchange(processedExchangeName);
+    }
+
+    @Bean
+    public Binding resourceProcessedBinding(Queue resourceProcessedQueue, TopicExchange resourceProcessedExchange) {
+        return BindingBuilder.bind(resourceProcessedQueue).to(resourceProcessedExchange).with(processedRoutingKey);
     }
 
 }

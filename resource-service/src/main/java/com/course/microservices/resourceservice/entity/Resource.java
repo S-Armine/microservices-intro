@@ -24,6 +24,10 @@ public class Resource {
     @Column(name = "s3_key", nullable = false, unique = true, length = 1024)
     private String s3Key;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "state", nullable = false, length = 32)
+    private ResourceState state;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

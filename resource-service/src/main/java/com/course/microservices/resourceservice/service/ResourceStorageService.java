@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -47,6 +48,19 @@ public class ResourceStorageService {
                     .build());
         } catch (SdkException ex) {
             throw new ResourceStorageException("Failed to delete resource from S3", ex);
+        }
+    }
+
+    public void copy(String sourceBucket, String sourceKey, String targetBucket, String targetKey) {
+        try {
+            s3Client.copyObject(CopyObjectRequest.builder()
+                    .sourceBucket(sourceBucket)
+                    .sourceKey(sourceKey)
+                    .destinationBucket(targetBucket)
+                    .destinationKey(targetKey)
+                    .build());
+        } catch (SdkException ex) {
+            throw new ResourceStorageException("Failed to copy resource in S3", ex);
         }
     }
 }
