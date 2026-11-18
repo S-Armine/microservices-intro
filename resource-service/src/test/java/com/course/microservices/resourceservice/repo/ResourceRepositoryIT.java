@@ -1,6 +1,7 @@
 package com.course.microservices.resourceservice.repo;
 
 import com.course.microservices.resourceservice.entity.Resource;
+import com.course.microservices.resourceservice.entity.ResourceState;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -21,7 +22,7 @@ class ResourceRepositoryIT {
 
     @Test
     void generatesAnIdAndStoresTheLocationOfTheFile() {
-        Resource saved = repository.saveAndFlush(new Resource(null, "resources", "resources/a.mp3", LocalDateTime.now()));
+        Resource saved = repository.saveAndFlush(new Resource(null, "resources", "resources/a.mp3", ResourceState.STAGING, LocalDateTime.now()));
 
         assertThat(saved.getId()).isNotNull();
         Resource found = repository.findById(saved.getId()).orElseThrow();
@@ -31,10 +32,10 @@ class ResourceRepositoryIT {
 
     @Test
     void theSameS3KeyCannotBeStoredTwice() {
-        repository.saveAndFlush(new Resource(null, "resources", "resources/dup.mp3", LocalDateTime.now()));
+        repository.saveAndFlush(new Resource(null, "resources", "resources/dup.mp3", ResourceState.STAGING, LocalDateTime.now()));
 
         assertThatThrownBy(() -> repository.saveAndFlush(
-                new Resource(null, "resources", "resources/dup.mp3", LocalDateTime.now())))
+                new Resource(null, "resources", "resources/dup.mp3", ResourceState.STAGING, LocalDateTime.now())))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

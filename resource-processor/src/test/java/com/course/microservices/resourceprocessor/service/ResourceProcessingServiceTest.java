@@ -2,6 +2,7 @@ package com.course.microservices.resourceprocessor.service;
 
 import com.course.microservices.resourceprocessor.dto.SongMetadataDto;
 import com.course.microservices.resourceprocessor.exception.InvalidMp3Exception;
+import com.course.microservices.resourceprocessor.producer.ResourceProcessedProducer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,6 +24,8 @@ class ResourceProcessingServiceTest {
     private Mp3MetadataExtractorService extractor;
     @Mock
     private SongServiceClient songServiceClient;
+    @Mock
+    private ResourceProcessedProducer processedProducer;
 
     @InjectMocks
     private ResourceProcessingService service;
@@ -36,6 +39,7 @@ class ResourceProcessingServiceTest {
         service.processResource("17");
 
         verify(songServiceClient).sendMetadata(new SongMetadataDto(17L, "Yesterday", "The Beatles", "Help!", "02:05", "1965"));
+        verify(processedProducer).sendMessage("17");
     }
 
     @Test
@@ -46,6 +50,7 @@ class ResourceProcessingServiceTest {
         assertThatThrownBy(() -> service.processResource("5")).isInstanceOf(InvalidMp3Exception.class);
 
         verify(songServiceClient, never()).sendMetadata(any());
+        verify(processedProducer, never()).sendMessage(any());
     }
 
     @Test
@@ -56,5 +61,6 @@ class ResourceProcessingServiceTest {
         assertThatThrownBy(() -> service.processResource("abc")).isInstanceOf(NumberFormatException.class);
 
         verify(songServiceClient, never()).sendMetadata(any());
+        verify(processedProducer, never()).sendMessage(any());
     }
 }

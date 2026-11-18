@@ -19,4 +19,14 @@ public class RestClientConfig {
                 .requestInterceptor(new LoadBalancerInterceptor(loadBalancerClient))
                 .build();
     }
+
+    @Bean
+    public RestClient storageServiceRestClient(@Value("${storage.service.url}") String baseUrl,
+                                               @Value("${storage.service.path}") String path,
+                                               LoadBalancerClient loadBalancerClient) {
+        return RestClient.builder()
+                .baseUrl(baseUrl + path)
+                .requestInterceptor(new LoadBalancerInterceptor(loadBalancerClient))
+                .build();
+    }
 }
