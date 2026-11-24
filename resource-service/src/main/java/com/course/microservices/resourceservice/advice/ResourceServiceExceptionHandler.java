@@ -5,6 +5,7 @@ import com.course.microservices.resourceservice.exception.CsvTooLongException;
 import com.course.microservices.resourceservice.exception.ResourceNotFoundException;
 import com.course.microservices.resourceservice.exception.ResourceStorageException;
 import com.course.microservices.resourceservice.exception.SongServiceInvocationException;
+import com.course.microservices.resourceservice.exception.StorageServiceInvocationException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -61,7 +62,7 @@ public class ResourceServiceExceptionHandler {
         return error(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
-    @ExceptionHandler({SongServiceInvocationException.class, ResourceStorageException.class})
+    @ExceptionHandler({SongServiceInvocationException.class, StorageServiceInvocationException.class, ResourceStorageException.class})
     public ResponseEntity<ErrorResponse> handleServiceInvocation(RuntimeException e) {
         return error(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
     }

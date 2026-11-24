@@ -20,6 +20,9 @@ public abstract class MessagingContractBase {
     @MockitoBean
     private com.course.microservices.resourceservice.service.ResourceStorageService storageService;
 
+    @MockitoBean
+    private com.course.microservices.resourceservice.service.StorageServiceClient storageServiceClient;
+
     @org.springframework.beans.factory.annotation.Autowired
     private ResourceService resourceService;
 
@@ -29,6 +32,8 @@ public abstract class MessagingContractBase {
     @BeforeEach
     void clearCapturedMessages() {
         rabbitTemplate.clear();
+        org.mockito.Mockito.when(storageServiceClient.getStorageByType("STAGING")).thenReturn(
+                new com.course.microservices.resourceservice.dto.StorageDto(1L, "STAGING", "staging-bucket", "resources"));
     }
 
     public void resourceUploaded() {

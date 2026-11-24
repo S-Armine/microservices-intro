@@ -1,6 +1,9 @@
 package com.course.microservices.resourceservice.controller;
 
+import com.course.microservices.resourceservice.dto.StorageDto;
 import com.course.microservices.resourceservice.entity.Resource;
+import com.course.microservices.resourceservice.entity.ResourceState;
+import com.course.microservices.resourceservice.service.StorageServiceClient;
 import com.course.microservices.resourceservice.repo.ResourceRepository;
 import com.course.microservices.resourceservice.helper.SongServiceMock;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,6 +58,8 @@ class ResourceControllerIT {
     private S3Client s3Client;
     @MockitoBean
     private RabbitTemplate rabbitTemplate;
+    @MockitoBean
+    private StorageServiceClient storageServiceClient;
 
     @DynamicPropertySource
     static void songService(DynamicPropertyRegistry registry) {
@@ -63,6 +68,8 @@ class ResourceControllerIT {
 
     @BeforeEach
     void reset() {
+        when(storageServiceClient.getStorageByType("STAGING"))
+                .thenReturn(new StorageDto(1L, "STAGING", "staging-bucket", "resources"));
         repository.deleteAll();
         SongServiceMock.SERVER.resetAll();
     }
@@ -104,7 +111,7 @@ class ResourceControllerIT {
 
     @Test
     void downloadReturnsTheStoredAudio() throws Exception {
-        Resource resource = repository.save(new Resource(null, "resources", "resources/x.mp3", LocalDateTime.now()));
+        Resource resource = repository.save(new Resource(null, "resources", "resources/x.mp3", ResourceState.STAGING, LocalDateTime.now()));
         when(s3Client.getObjectAsBytes(any(GetObjectRequest.class)))
                 .thenReturn(ResponseBytes.fromByteArray(GetObjectResponse.builder().build(), new byte[]{4, 5}));
 
@@ -116,7 +123,7 @@ class ResourceControllerIT {
 
     @Test
     void deleteTellsSongServiceThenRemovesFileAndRow() throws Exception {
-        Resource resource = repository.save(new Resource(null, "resources", "resources/y.mp3", LocalDateTime.now()));
+        Resource resource = repository.save(new Resource(null, "resources", "resources/y.mp3", ResourceState.STAGING, LocalDateTime.now()));
         SongServiceMock.SERVER.stubFor(com.github.tomakehurst.wiremock.client.WireMock.delete(urlPathEqualTo("/songs"))
                 .withQueryParam("id", equalTo(resource.getId().toString()))
                 .willReturn(aResponse().withStatus(200).withHeader("Content-Type", "application/json")
