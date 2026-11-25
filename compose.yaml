@@ -1,3 +1,7 @@
+x-logging-env: &logging-env
+  LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+
 services:
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
@@ -71,6 +75,7 @@ services:
       context: .
       dockerfile: resource-service/Dockerfile
     environment:
+      <<: *logging-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://resource-db:5432/resource-db
       SPRING_DATASOURCE_USERNAME: ${RESOURCE_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${RESOURCE_DB_PASSWORD}
@@ -109,6 +114,7 @@ services:
       context: .
       dockerfile: resource-processor/Dockerfile
     environment:
+      <<: *logging-env
       SERVER_PORT: ${RESOURCE_PROCESSOR_PORT:-8082}
       SPRING_RABBITMQ_HOST: ${SPRING_RABBITMQ_HOST}
       SPRING_RABBITMQ_PORT: ${SPRING_RABBITMQ_PORT}
@@ -138,6 +144,7 @@ services:
       context: .
       dockerfile: song-service/Dockerfile
     environment:
+      <<: *logging-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://song-db:5432/song-db
       SPRING_DATASOURCE_USERNAME: ${SONG_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SONG_DB_PASSWORD}
@@ -164,6 +171,7 @@ services:
       context: .
       dockerfile: eureka-server/Dockerfile
     environment:
+      <<: *logging-env
       SERVER_PORT: ${EUREKA_SERVER_PORT:-8761}
     ports:
       - "${EUREKA_SERVER_PORT:-8761}:${EUREKA_SERVER_PORT:-8761}"
@@ -179,6 +187,7 @@ services:
       context: .
       dockerfile: api-gateway/Dockerfile
     environment:
+      <<: *logging-env
       SERVER_PORT: ${API_GATEWAY_PORT:-8083}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE}
     ports:
@@ -215,6 +224,7 @@ services:
       context: .
       dockerfile: storage-service/Dockerfile
     environment:
+      <<: *logging-env
       SPRING_DATASOURCE_URL: jdbc:postgresql://storage-db:5432/storage-db
       SPRING_DATASOURCE_USERNAME: ${STORAGE_DB_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${STORAGE_DB_PASSWORD}
@@ -237,3 +247,98 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.3
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.15.3
+    container_name: kibana
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:5601/api/status | grep -q '\"level\":\"available\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.15.3
+    container_name: filebeat
+    restart: unless-stopped
+    user: root
+    command: ["filebeat", "-e", "--strict.perms=false"]
+    volumes:
+      - ./logging/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - filebeat-data:/usr/share/filebeat/data
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+volumes:
+  elasticsearch-data:
+  filebeat-data:
+  prometheus-data:
+  grafana-data:
