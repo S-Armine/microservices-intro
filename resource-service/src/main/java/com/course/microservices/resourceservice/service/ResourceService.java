@@ -63,6 +63,7 @@ public class ResourceService {
         resourceStorageService.upload(storage.bucket(), key, audioData);
         Resource savedResource = resourceRepository.save(new Resource(null, storage.bucket(), key, ResourceState.STAGING, LocalDateTime.now()));
         resourceProducer.sendMessage(savedResource.getId().toString());
+        log.info("Resource uploaded: ID={}, queued for processing", savedResource.getId());
         return savedResource.getId();
     }
 
@@ -85,5 +86,6 @@ public class ResourceService {
         resource.setS3Key(key);
         resourceRepository.save(resource);
         resourceStorageService.delete(sourceBucket, sourceKey);
+        log.info("Resource ID={} moved to {} storage", id, PERMANENT);
     }
 }

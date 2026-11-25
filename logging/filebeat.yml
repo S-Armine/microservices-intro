@@ -1,0 +1,39 @@
+filebeat.inputs:
+  - type: filestream
+    id: docker-containers
+    paths:
+      - /var/lib/docker/containers/*/*.log
+    parsers:
+      - container: ~
+      - ndjson:
+          target: ""
+          overwrite_keys: true
+          add_error_key: false
+          message_key: message
+
+processors:
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  - drop_event:
+      when:
+        or:
+          - equals:
+              container.name: filebeat
+          - equals:
+              container.name: elasticsearch
+          - equals:
+              container.name: kibana
+  - drop_fields:
+      fields: ["agent", "ecs", "input", "log.offset", "log.file"]
+      ignore_missing: true
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+  index: "microservices-logs-%{+yyyy.MM.dd}"
+
+setup.ilm.enabled: false
+setup.template.name: "microservices-logs"
+setup.template.pattern: "microservices-logs-*"
+setup.kibana.host: "http://kibana:5601"
+
+logging.level: warning

@@ -2,6 +2,7 @@ package com.course.microservices.resourceservice.service;
 
 import com.course.microservices.resourceservice.dto.StorageDto;
 import com.course.microservices.resourceservice.exception.StorageServiceInvocationException;
+import com.course.microservices.resourceservice.tracing.TraceId;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
@@ -28,7 +29,8 @@ public class StorageServiceClient {
     }
 
     public StorageDto getStorageByType(String storageType) {
-        return circuitBreaker.run(() -> fetch(storageType), ex -> {
+        String traceId = TraceId.current();
+        return circuitBreaker.run(() -> TraceId.callWith(traceId, () -> fetch(storageType)), ex -> {
             log.warn("Storage service unavailable ({}), using stub {} storage", ex.toString(), storageType);
             return storageFallback.get(storageType);
         });
